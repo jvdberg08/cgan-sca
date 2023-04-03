@@ -54,7 +54,7 @@ class DataLoader:
         For more details, check here: https://github.com/ANSSI-FR/ASCAD/tree/master/ATMEGA_AES_v1
         """
 
-        self.filepath = "D:/traces/ascad-variable_49900_to_50900.h5"
+        self.filepath = "./ascad-variable_49900_to_50900.h5"
 
         self.aes_key = "00112233445566778899AABBCCDDEEFF"  # AES encryption key
         self.target_byte_index = 0  # target AES key byte index
@@ -283,7 +283,7 @@ class ConditionalGANSCA:
         y_zeros = zeros((n_samples, 1))  # create class labels for the discriminator (class 0s means data is coming from generator source)
         return [fake_traces, labels_input], y_zeros
 
-    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch):
+    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, epoch_tmp_var):
 
         """
         Compute Signal-to-Noise Ratio (SNR) between measurements and labels
@@ -306,7 +306,8 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.show()
+        if epoch_tmp_var > 50:
+            plt.show()
 
     def train(self, n_epochs=10, training_set_size=200000):
         # determine half the size of one batch, for updating the discriminator
@@ -346,7 +347,7 @@ class ConditionalGANSCA:
                 # generate a batch of fake measurements
                 [traces_fake_batch, labels_fake_batch], _ = self.generate_fake_samples(generated_batch_size)
 
-                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch)
+                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, i)
 
         self.generator.save("generator_ascad_variable.h5")
 
@@ -376,7 +377,7 @@ class ConditionalGANSCA:
         - if this function returns final_ge=256, it means that the correct key is actually indicated as the least likely one.
         - if this function returns final_ge close to 128, it means that the attack is wrong and the model is simply returing a random key.
 
-        :return
+         :return
         - final_ge: the guessing entropy of the correct key
         - guessing_entropy: a vector indicating the value 'final_ge' with respect to the number of processed attack measurements
         - number_of_measurements_for_ge_1: the number of processed attack measurements necessary to reach final_ge = 1
