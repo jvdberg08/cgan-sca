@@ -1,4 +1,6 @@
 # train a generative adversarial network on a one-dimensional function
+import sys
+
 import numpy as np
 from numpy import zeros
 from numpy import ones
@@ -32,6 +34,71 @@ aes_sbox = np.array([
     0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 ])
+
+
+def get_generator_layers(generator_idx, input_layer):
+    gen = input_layer
+    if generator_idx == 1:
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+    elif generator_idx == 2:
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+    elif generator_idx == 3:
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+    elif generator_idx == 4:
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
+    elif generator_idx == 5:
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+    elif generator_idx == 6:
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = Dropout(0.2)(gen)
+        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
+    else:
+        print(generator_idx)
+        raise Exception("Invalid Generator Index")
+    return gen
 
 
 class DataLoader:
@@ -154,7 +221,9 @@ class DataLoader:
 
 class ConditionalGANSCA:
 
-    def __init__(self):
+    def __init__(self, generator_file, generator_idx):
+        self.generator_file = generator_file
+        self.generator_idx = generator_idx
 
         """ Create dataset """
         self.dataset = DataLoader()
@@ -228,12 +297,7 @@ class ConditionalGANSCA:
         # gen = Dense(400, activation='elu')(input_random_data)
 
         merge = Concatenate()([input_random_data, li])
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(merge)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+        gen = get_generator_layers(self.generator_idx, merge)
         out_layer = Dense(self.latent_dim, activation='linear')(gen)
 
         # define model
@@ -267,7 +331,9 @@ class ConditionalGANSCA:
         rnd = random.randint(0, len(self.dataset.x_profiling) - batch_size)
         traces = self.dataset.x_profiling[rnd:rnd + batch_size]
         labels = self.dataset.profiling_labels[rnd:rnd + batch_size]
-        y_ones = ones((batch_size, 1))  # generate class labels for the discriminator (class 1s means data is coming from generator source)
+
+        # generate class labels for the discriminator (class 1s means data is coming from generator source)
+        y_ones = ones((batch_size, 1))
         return [traces, labels], y_ones, rnd
 
     def generate_latent_points(self, n_samples, n_classes=256, labels=None):
@@ -279,11 +345,14 @@ class ConditionalGANSCA:
 
     def generate_fake_samples(self, n_samples, labels=None):
         z_input, labels_input = self.generate_latent_points(n_samples, labels=labels)  # generate points in latent space
-        fake_traces = self.generator.predict([z_input, labels_input])  # predict generator to obtain fake/generates traces
-        y_zeros = zeros((n_samples, 1))  # create class labels for the discriminator (class 0s means data is coming from generator source)
+        # predict generator to obtain fake/generates traces
+        fake_traces = self.generator.predict([z_input, labels_input], verbose=0)
+
+        # create class labels for the discriminator (class 0s means data is coming from generator source)
+        y_zeros = zeros((n_samples, 1))
         return [fake_traces, labels_input], y_zeros
 
-    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, epoch_tmp_var):
+    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch):
 
         """
         Compute Signal-to-Noise Ratio (SNR) between measurements and labels
@@ -306,8 +375,7 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        if epoch_tmp_var > 50:
-            plt.show()
+        plt.show()
 
     def train(self, n_epochs=10, training_set_size=200000):
         # determine half the size of one batch, for updating the discriminator
@@ -347,9 +415,9 @@ class ConditionalGANSCA:
                 # generate a batch of fake measurements
                 [traces_fake_batch, labels_fake_batch], _ = self.generate_fake_samples(generated_batch_size)
 
-                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, i)
+                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch)
 
-        self.generator.save("generator_ascad_variable.h5")
+        self.generator.save(self.generator_file)
 
     def mlp(self, classes, number_of_samples):
         input_shape = (number_of_samples)
@@ -368,7 +436,8 @@ class ConditionalGANSCA:
         m_model.summary()
         return m_model
 
-    def guessing_entropy(self, predictions, labels_guess, good_key, key_rank_attack_traces, key_rank_report_interval=10):
+    def guessing_entropy(self, predictions, labels_guess, good_key, key_rank_attack_traces,
+                         key_rank_report_interval=10):
 
         """
         Function to compute Guessing Entropy
@@ -430,7 +499,7 @@ class ConditionalGANSCA:
         return final_ge, guessing_entropy, number_of_measurements_for_ge_1
 
     def snr_synthetic_set(self, traces, labels):
-        labels = [[int(l)] for l in labels]  # this has to be done to be compatible with SNR class
+        labels = [[int(label)] for label in labels]  # this has to be done to be compatible with SNR class
         snr = SNR(np=1, ns=self.latent_dim, nc=256)
         snr.fit_u(np.array(traces, dtype=np.int16), x=np.array(labels, dtype=np.uint16))
         snr_val = snr.get_snr()
@@ -447,13 +516,13 @@ class ConditionalGANSCA:
         """ Generate a batch of synthetic measurements with the trained generator """
         generated_batch_size = 200000
         self.generator = self.define_generator()
-        self.generator.load_weights("generator_ascad_variable.h5")
+        self.generator.load_weights(self.generator_file)
         # [traces_synthetic, labels_synthetic], _ = self.generate_fake_samples(generated_batch_size)
         # traces_synthetic = self.scaler.transform(traces_synthetic)
         traces_synthetic = []
         labels_synthetic = []
         n_avg = 100
-        for l in tqdm(range(10000)):
+        for _ in tqdm(range(10000)):
             label = np.random.randint(0, 256, 1)
             [traces, _], _ = self.generate_fake_samples(n_avg, labels=np.array([label for _ in range(n_avg)]))
             traces_synthetic.append(np.mean(traces, axis=0))
@@ -479,10 +548,20 @@ class ConditionalGANSCA:
         """ Predict the trained MLP with target/attack measurements """
         predictions = model.predict(self.dataset.x_attack)
         """ Check if we are able to recover the key from the target/attack measurements """
-        self.guessing_entropy(predictions, self.dataset.labels_key_guesses_attack, self.dataset.correct_key_byte_attack, 5000)
+        self.guessing_entropy(predictions, self.dataset.labels_key_guesses_attack, self.dataset.correct_key_byte_attack,
+                              5000)
 
 
 if __name__ == '__main__':
-    cgan = ConditionalGANSCA()
-    cgan.train()
+    gen_idx = 1
+    if len(sys.argv) > 1:
+        gen_idx = sys.argv[1]
+
+    should_train = True
+    if len(sys.argv) > 2:
+        should_train = False if sys.argv[2] == 'false' else True
+
+    cgan = ConditionalGANSCA("generator_" + gen_idx + "_ascad_variable.h5", int(gen_idx))
+    if should_train:
+        cgan.train()
     cgan.attack()
