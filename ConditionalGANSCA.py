@@ -5,10 +5,11 @@ import numpy as np
 from numpy import zeros
 from numpy import ones
 from numpy.random import rand
-from keras.models import *
-from keras.layers import *
-from keras.optimizers import *
-from keras.utils import *
+from tensorflow.keras.models import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.optimizers import *
+from tensorflow.keras.utils import *
+import tensorflow
 import h5py
 import random
 from sklearn.preprocessing import StandardScaler
@@ -178,7 +179,7 @@ class DataLoader:
     Function aes_labelize
     :Parameters: 2D array with plaintexts, 2D array with keys 
     :Return: 1D vector with labels
-      
+
     :Description: 
     This function defines a label for each side-channel trace/measurement.
     The label represents one out of S-box output bytes (the S-box operation outputs 16 bytes and this function selects the byte 
@@ -204,7 +205,7 @@ class DataLoader:
     Function aes_labelize_key_guesses
     : Parameters: 2D array with plaintexts
     : Return: 2D array where each row is contains labels for each possible key byte value
-    
+
     : Description:
     This function calls 'aes_labelize' function for each possible value of the target key byte (i.e., 256 possible values).
     This 'labels_key_guesses' is used when computing the attack performance with a key rank metric.
@@ -352,7 +353,7 @@ class ConditionalGANSCA:
         y_zeros = zeros((n_samples, 1))
         return [fake_traces, labels_input], y_zeros
 
-    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch):
+    def compute_snr(self, traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, epoch):
 
         """
         Compute Signal-to-Noise Ratio (SNR) between measurements and labels
@@ -375,7 +376,8 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.show()
+        plt.savefig('./results/result_' + str(self.generator_idx) + '_' + str(epoch) + '.png')
+        plt.clf()
 
     def train(self, n_epochs=10, training_set_size=200000):
         # determine half the size of one batch, for updating the discriminator
@@ -415,7 +417,7 @@ class ConditionalGANSCA:
                 # generate a batch of fake measurements
                 [traces_fake_batch, labels_fake_batch], _ = self.generate_fake_samples(generated_batch_size)
 
-                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch)
+                self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, i)
 
         self.generator.save(self.generator_file)
 
@@ -509,7 +511,8 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.show()
+        plt.savefig('./results/result_' + str(self.generator_idx) + '_final.png')
+        plt.clf()
 
     def attack(self):
 
@@ -561,7 +564,10 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         should_train = False if sys.argv[2] == 'false' else True
 
-    cgan = ConditionalGANSCA("generator_" + gen_idx + "_ascad_variable.h5", int(gen_idx))
+    print("Generator Index: " + gen_idx)
+    print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
+
+    cgan = ConditionalGANSCA("./results/generator_" + gen_idx + ".h5", int(gen_idx))
     if should_train:
         cgan.train()
     cgan.attack()
