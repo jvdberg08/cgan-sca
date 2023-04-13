@@ -310,10 +310,12 @@ class ConditionalGANSCA:
         plt.clf()
 
     def train(self, n_epochs=10, training_set_size=200000):
-        # determine half the size of one batch, for updating the discriminator
-        # half_training_set_size = int(training_set_size / 2)
         batch_size = 400
         n_batches = int(training_set_size / batch_size)
+
+        all_d_loss_real = []
+        all_d_loss_fake = []
+        all_g_loss = []
 
         # manually enumerate epochs
         for i in range(n_epochs):
@@ -334,6 +336,10 @@ class ConditionalGANSCA:
                 g_loss = self.gan_model.train_on_batch([z_input, labels_input], y_gan)
                 # evaluate the model every n_eval epochs
 
+                all_d_loss_real.append(d_loss1)
+                all_d_loss_fake.append(d_loss2)
+                all_g_loss.append(g_loss)
+
                 print(f"epoch: {i}, batch: {j}, d_loss_real: {d_loss1}, d_loss_fake: {d_loss2}, g_loss: {g_loss}")
 
             # check results after processing 1 epoch during training
@@ -349,6 +355,20 @@ class ConditionalGANSCA:
 
                 self.compute_snr(traces_real_batch, labels_real_batch, traces_fake_batch, labels_fake_batch, i)
 
+        plt.plot(all_d_loss_real, label='d_loss_real')
+        plt.plot(all_d_loss_fake, label='d_loss_fake')
+        plt.xlabel("Batch")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig('./results/d_loss_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '.png')
+        plt.clf()
+
+        plt.plot(all_g_loss, label='g_loss')
+        plt.xlabel("Batch")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig('./results/g_loss_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '.png')
+        plt.clf()
         self.generator.save(self.generator_file)
 
     def mlp(self, classes, number_of_samples):
