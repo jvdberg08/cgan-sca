@@ -17,6 +17,9 @@ from scalib.metrics import SNR
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+from discriminator import get_discriminator_layers
+from generator import get_generator_layers
+
 aes_sbox = np.array([
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -35,71 +38,6 @@ aes_sbox = np.array([
     0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 ])
-
-
-def get_generator_layers(generator_idx, input_layer):
-    gen = input_layer
-    if generator_idx == 1:
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-    elif generator_idx == 2:
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-    elif generator_idx == 3:
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-    elif generator_idx == 4:
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(200, activation='elu', kernel_initializer='he_uniform')(gen)
-    elif generator_idx == 5:
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-    elif generator_idx == 6:
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.2)(gen)
-        gen = Dense(100, activation='elu', kernel_initializer='he_uniform')(gen)
-    else:
-        print(generator_idx)
-        raise Exception("Invalid Generator Index")
-    return gen
 
 
 class DataLoader:
@@ -146,7 +84,7 @@ class DataLoader:
         self.correct_key_byte_validation = bytearray.fromhex(self.aes_key)[self.target_byte_index]
         self.correct_key_byte_attack = bytearray.fromhex(self.aes_key)[self.target_byte_index]
 
-        # read and split attack set with 100,000 elements into validation and attack sets with 50,000 elements each.
+        # read and split attack set with 100,000 elements into validation and attack sets, both with 20,000 elements.
         attack_samples = np.array(in_file['Attack_traces/traces'])
         attack_plaintext = in_file['Attack_traces/metadata']['plaintext']
         attack_key = in_file['Attack_traces/metadata']['key']
@@ -222,9 +160,10 @@ class DataLoader:
 
 class ConditionalGANSCA:
 
-    def __init__(self, generator_file, generator_idx):
+    def __init__(self, generator_file, generator_idx, discriminator_idx):
         self.generator_file = generator_file
         self.generator_idx = generator_idx
+        self.discriminator_idx = discriminator_idx
 
         """ Create dataset """
         self.dataset = DataLoader()
@@ -262,18 +201,8 @@ class ConditionalGANSCA:
 
         input_traces = Input(shape=self.latent_dim)
         merge = Concatenate()([input_traces, li])
-
-        x = Dense(200, activation='elu', kernel_initializer='he_uniform')(merge)
-        x = Dropout(0.3)(x)
-        x = Dense(200, activation='elu', kernel_initializer='he_uniform')(x)
-        x = Dropout(0.3)(x)
-        x = Dense(200, activation='elu', kernel_initializer='he_uniform')(x)
-        x = Dropout(0.3)(x)
-        x = Dense(200, activation='elu', kernel_initializer='he_uniform')(x)
-        x = Dropout(0.3)(x)
-
-        # output
-        out_layer = Dense(1, activation='sigmoid')(x)
+        disc = get_discriminator_layers(self.discriminator_idx, merge)
+        out_layer = Dense(1, activation='sigmoid')(disc)
 
         model = Model([input_traces, input_label], out_layer)
         model.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.001), metrics=['accuracy'])
@@ -376,7 +305,8 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.savefig('./results/result_' + str(self.generator_idx) + '_' + str(epoch) + '.png')
+        plt.savefig('./results/result_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '_' + str(
+            epoch) + '.png')
         plt.clf()
 
     def train(self, n_epochs=10, training_set_size=200000):
@@ -406,7 +336,7 @@ class ConditionalGANSCA:
 
                 print(f"epoch: {i}, batch: {j}, d_loss_real: {d_loss1}, d_loss_fake: {d_loss2}, g_loss: {g_loss}")
 
-            # check results after processing 100 epochs during training
+            # check results after processing 1 epoch during training
             if (i + 1) % 1 == 0:
                 generated_batch_size = 10000
                 # randomly select a batch of real measurements
@@ -422,7 +352,7 @@ class ConditionalGANSCA:
         self.generator.save(self.generator_file)
 
     def mlp(self, classes, number_of_samples):
-        input_shape = (number_of_samples)
+        input_shape = number_of_samples
         input_layer = Input(shape=input_shape, name="input_layer")
 
         x = Dense(20, kernel_initializer="glorot_normal", activation="elu")(input_layer)
@@ -448,7 +378,7 @@ class ConditionalGANSCA:
         - if this function returns final_ge=256, it means that the correct key is actually indicated as the least likely one.
         - if this function returns final_ge close to 128, it means that the attack is wrong and the model is simply returing a random key.
 
-         :return
+        :return
         - final_ge: the guessing entropy of the correct key
         - guessing_entropy: a vector indicating the value 'final_ge' with respect to the number of processed attack measurements
         - number_of_measurements_for_ge_1: the number of processed attack measurements necessary to reach final_ge = 1
@@ -495,6 +425,7 @@ class ConditionalGANSCA:
                     break
 
         final_ge = guessing_entropy[int(key_rank_attack_traces / key_rank_report_interval) - 1]
+        print("GE Vector = {}".format(guessing_entropy))
         print("GE = {}".format(final_ge))
         print("Number of traces to reach GE = 1: {}".format(number_of_measurements_for_ge_1))
 
@@ -511,7 +442,8 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.savefig('./results/result_' + str(self.generator_idx) + '_final.png')
+        plt.savefig(
+            './results/result_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '_' + '_final.png')
         plt.clf()
 
     def attack(self):
@@ -560,14 +492,21 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         gen_idx = sys.argv[1]
 
-    should_train = True
+    disc_idx = 1
     if len(sys.argv) > 2:
-        should_train = False if sys.argv[2] == 'false' else True
+        disc_idx = sys.argv[2]
+
+    should_train = True
+    if len(sys.argv) > 3:
+        should_train = False if sys.argv[3] == 'false' else True
 
     print("Generator Index: " + gen_idx)
+    print("Discriminator Index: " + disc_idx)
     print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
 
-    cgan = ConditionalGANSCA("./results/generator_" + gen_idx + ".h5", int(gen_idx))
+    cgan = ConditionalGANSCA("./results/generator_" + gen_idx + "_" + disc_idx + ".h5",
+                             generator_idx=int(gen_idx),
+                             discriminator_idx=int(disc_idx))
     if should_train:
         cgan.train()
     cgan.attack()
