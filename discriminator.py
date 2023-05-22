@@ -11,7 +11,6 @@ def get_discriminator_layers(discriminator_idx, input_layer):
         gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
         gen = Dropout(0.3)(gen)
         gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.3)(gen)
     else:
         print(discriminator_idx)
         raise Exception("Invalid Discriminator Index")

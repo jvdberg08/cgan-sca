@@ -375,15 +375,17 @@ class ConditionalGANSCA:
         input_shape = number_of_samples
         input_layer = Input(shape=input_shape, name="input_layer")
 
-        x = Dense(20, kernel_initializer="glorot_normal", activation="elu")(input_layer)
-        x = Dense(20, kernel_initializer="glorot_normal", activation="elu")(x)
-        x = Dense(20, kernel_initializer="glorot_normal", activation="elu")(x)
-        x = Dense(20, kernel_initializer="glorot_normal", activation="elu")(x)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(input_layer)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(x)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(x)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(x)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(x)
+        x = Dense(200, kernel_initializer="glorot_normal", activation="relu")(x)
 
         output_layer = Dense(classes, activation='softmax', name=f'output')(x)
 
         m_model = Model(input_layer, output_layer, name='mlp_softmax')
-        optimizer = Adam(lr=0.001)
+        optimizer = RMSprop(lr=0.00001)
         m_model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
         m_model.summary()
         return m_model
@@ -445,9 +447,10 @@ class ConditionalGANSCA:
                     break
 
         final_ge = guessing_entropy[int(key_rank_attack_traces / key_rank_report_interval) - 1]
-        print("GE Vector = {}".format(guessing_entropy))
-        print("GE = {}".format(final_ge))
-        print("Number of traces to reach GE = 1: {}".format(number_of_measurements_for_ge_1))
+        prefix = "[G" + str(self.generator_idx) + ", D" + str(self.discriminator_idx) + "] "
+        print(prefix + "GE Vector = {}".format(guessing_entropy))
+        print(prefix + "GE = {}".format(final_ge))
+        print(prefix + "Number of traces to reach GE = 1: {}".format(number_of_measurements_for_ge_1))
 
         return final_ge, guessing_entropy, number_of_measurements_for_ge_1
 
@@ -493,9 +496,9 @@ class ConditionalGANSCA:
         model.fit(
             x=traces_synthetic,
             y=to_categorical(labels_synthetic, num_classes=self.dataset.classes),
-            batch_size=400,
+            batch_size=100,
             verbose=2,
-            epochs=100,
+            epochs=200,
             shuffle=True,
             validation_data=(self.dataset.x_attack, self.dataset.y_attack),
             callbacks=[])
