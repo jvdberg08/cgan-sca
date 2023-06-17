@@ -118,13 +118,11 @@ class DataLoader:
     :Parameters: 2D array with plaintexts, 2D array with keys 
     :Return: 1D vector with labels
 
-    :Description: 
-    This function defines a label for each side-channel trace/measurement.
-    The label represents one out of S-box output bytes (the S-box operation outputs 16 bytes and this function selects the byte 
-    corresponding to the target key, which is key byte 0. So, label = S-box(k0 XOR p0), where k0 is the key byte 0 and p0 is the plaintext
-    byte with index 0.
-    If leakage model is set to Hamming weight (HW), then the label is converted from decimal to its Hamming weight value.
-    """
+    :Description: This function defines a label for each side-channel trace/measurement. The label represents one out 
+    of S-box output bytes (the S-box operation outputs 16 bytes and this function selects the byte corresponding to 
+    the target key, which is key byte 0. So, label = S-box(k0 XOR p0), where k0 is the key byte 0 and p0 is the 
+    plaintext byte with index 0. If leakage model is set to Hamming weight (HW), then the label is converted from 
+    decimal to its Hamming weight value."""
 
     def aes_labelize(self, plaintexts, keys):
 
@@ -144,10 +142,9 @@ class DataLoader:
     : Parameters: 2D array with plaintexts
     : Return: 2D array where each row is contains labels for each possible key byte value
 
-    : Description:
-    This function calls 'aes_labelize' function for each possible value of the target key byte (i.e., 256 possible values).
-    This 'labels_key_guesses' is used when computing the attack performance with a key rank metric.
-    """
+    : Description: This function calls 'aes_labelize' function for each possible value of the target key byte (i.e., 
+    256 possible values). This 'labels_key_guesses' is used when computing the attack performance with a key rank 
+    metric."""
 
     def aes_labelize_key_guesses(self, plaintexts):
         labels_key_guesses = np.zeros((256, len(plaintexts)), dtype='int64')
@@ -160,10 +157,23 @@ class DataLoader:
 
 class ConditionalGANSCA:
 
-    def __init__(self, generator_file, generator_idx, discriminator_idx):
-        self.generator_file = generator_file
-        self.generator_idx = generator_idx
-        self.discriminator_idx = discriminator_idx
+    def __init__(self, num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
+                 num_nodes_disc, activation_fn_disc):
+        self.file_suffix = "lg" + str(num_layers_gen) \
+                           + "_ng" + str(num_nodes_gen) \
+                           + "_ag" + activation_fn_gen \
+                           + "_ld" + str(num_layers_disc) \
+                           + "_dd" + str(dropout_percentage_disc) \
+                           + "_nd" + str(num_nodes_disc) \
+                           + "_ad" + activation_fn_disc
+        self.generator_file = "./results/generator_" + self.file_suffix + ".h5"
+        self.num_layers_gen = num_layers_gen
+        self.num_nodes_gen = num_nodes_gen
+        self.activation_fn_gen = activation_fn_gen
+        self.num_layers_disc = num_layers_disc
+        self.dropout_percentage_disc = dropout_percentage_disc
+        self.num_nodes_disc = num_nodes_disc
+        self.activation_fn_disc = activation_fn_disc
 
         """ Create dataset """
         self.dataset = DataLoader()
@@ -201,7 +211,8 @@ class ConditionalGANSCA:
 
         input_traces = Input(shape=self.latent_dim)
         merge = Concatenate()([input_traces, li])
-        disc = get_discriminator_layers(self.discriminator_idx, merge)
+        disc = get_discriminator_layers(merge, self.num_layers_disc, self.dropout_percentage_disc, self.num_nodes_disc,
+                                        self.activation_fn_disc)
         out_layer = Dense(1, activation='sigmoid')(disc)
 
         model = Model([input_traces, input_label], out_layer)
@@ -227,7 +238,7 @@ class ConditionalGANSCA:
         # gen = Dense(400, activation='elu')(input_random_data)
 
         merge = Concatenate()([input_random_data, li])
-        gen = get_generator_layers(self.generator_idx, merge)
+        gen = get_generator_layers(merge, self.num_layers_gen, self.num_nodes_gen, self.activation_fn_gen)
         out_layer = Dense(self.latent_dim, activation='linear')(gen)
 
         # define model
@@ -305,8 +316,7 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.savefig('./results/result_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '_' + str(
-            epoch) + '.png')
+        plt.savefig('./results/result_e' + str(epoch) + '_' + self.file_suffix + '.png')
         plt.clf()
 
     def train(self, n_epochs=10, training_set_size=200000):
@@ -360,15 +370,25 @@ class ConditionalGANSCA:
         plt.xlabel("Batch")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig('./results/d_loss_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '.png')
+        plt.savefig('./results/d_loss_' + self.file_suffix + '.png')
         plt.clf()
+        with open('./results/d_loss_real_' + self.file_suffix + '.txt', "w") as txt_file:
+            for batch in all_d_loss_real:
+                txt_file.write(str(batch) + "\n")
+        with open('./results/d_loss_fake_' + self.file_suffix + '.txt', "w") as txt_file:
+            for batch in all_d_loss_fake:
+                txt_file.write(str(batch) + "\n")
 
         plt.plot(all_g_loss, label='g_loss')
         plt.xlabel("Batch")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig('./results/g_loss_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '.png')
+        plt.savefig('./results/g_loss_' + self.file_suffix + '.png')
         plt.clf()
+        with open('./results/g_loss_' + self.file_suffix + '.txt', "w") as txt_file:
+            for batch in all_g_loss:
+                txt_file.write(str(batch) + "\n")
+
         self.generator.save(self.generator_file)
 
     def mlp(self, classes, number_of_samples):
@@ -394,16 +414,17 @@ class ConditionalGANSCA:
                          key_rank_report_interval=10):
 
         """
-        Function to compute Guessing Entropy
-        - this function computes a list of key candidates, ordered by their probability of being the correct key
-        - if this function returns final_ge=1, it means that the correct key is actually indicated as the most likely one.
-        - if this function returns final_ge=256, it means that the correct key is actually indicated as the least likely one.
-        - if this function returns final_ge close to 128, it means that the attack is wrong and the model is simply returing a random key.
 
-        :return
-        - final_ge: the guessing entropy of the correct key
-        - guessing_entropy: a vector indicating the value 'final_ge' with respect to the number of processed attack measurements
-        - number_of_measurements_for_ge_1: the number of processed attack measurements necessary to reach final_ge = 1
+        Function to compute Guessing Entropy - this function computes a list of key candidates, ordered by their
+        probability of being the correct key - if this function returns final_ge=1, it means that the correct key is
+        actually indicated as the most likely one. - if this function returns final_ge=256, it means that the correct
+        key is actually indicated as the least likely one. - if this function returns final_ge close to 128,
+        it means that the attack is wrong and the model is simply returing a random key.
+
+        :return - final_ge: the guessing entropy of the correct key - guessing_entropy: a vector indicating the value
+        'final_ge' with respect to the number of processed attack measurements - number_of_measurements_for_ge_1: the
+        number of processed attack measurements necessary to reach final_ge = 1
+
         """
 
         nt = len(predictions)
@@ -447,10 +468,21 @@ class ConditionalGANSCA:
                     break
 
         final_ge = guessing_entropy[int(key_rank_attack_traces / key_rank_report_interval) - 1]
-        prefix = "[G" + str(self.generator_idx) + ", D" + str(self.discriminator_idx) + "] "
-        print(prefix + "GE Vector = {}".format(guessing_entropy))
-        print(prefix + "GE = {}".format(final_ge))
-        print(prefix + "Number of traces to reach GE = 1: {}".format(number_of_measurements_for_ge_1))
+
+        plt.plot(guessing_entropy, label='GE')
+        plt.xlabel("Trace")
+        plt.ylabel("Guessing Entropy")
+        plt.legend()
+        plt.savefig('./results/ge_' + self.file_suffix + '.png')
+        plt.clf()
+
+        with open('./results/ge_' + self.file_suffix + '.txt', "w") as txt_file:
+            for ge in guessing_entropy:
+                txt_file.write(str(ge) + "\n")
+
+        print("GE Vector = {}".format(guessing_entropy))
+        print("GE = {}".format(final_ge))
+        print("Number of traces to reach GE = 1: {}".format(number_of_measurements_for_ge_1))
 
         return final_ge, guessing_entropy, number_of_measurements_for_ge_1
 
@@ -465,8 +497,7 @@ class ConditionalGANSCA:
         plt.xlabel("Points")
         plt.ylabel("SNR")
         plt.legend()
-        plt.savefig(
-            './results/result_' + str(self.generator_idx) + '_' + str(self.discriminator_idx) + '_' + '_final.png')
+        plt.savefig('./results/result_final_' + self.file_suffix + '.png')
         plt.clf()
 
     def attack(self):
@@ -511,25 +542,31 @@ class ConditionalGANSCA:
 
 
 if __name__ == '__main__':
-    gen_idx = 1
-    if len(sys.argv) > 1:
-        gen_idx = sys.argv[1]
+    num_layers_gen = int(sys.argv[1])
+    num_nodes_gen = int(sys.argv[2])
+    activation_fn_gen = sys.argv[3]
 
-    disc_idx = 1
-    if len(sys.argv) > 2:
-        disc_idx = sys.argv[2]
+    if activation_fn_gen not in ['elu', 'relu', 'leaky-relu']:
+        raise Exception('Invalid activation function')
 
-    should_train = True
-    if len(sys.argv) > 3:
-        should_train = False if sys.argv[3] == 'false' else True
+    num_layers_disc = int(sys.argv[4])
+    dropout_percentage_disc = float(sys.argv[5])
+    num_nodes_disc = int(sys.argv[6])
+    activation_fn_disc = sys.argv[7]
 
-    print("Generator Index: " + gen_idx)
-    print("Discriminator Index: " + disc_idx)
+    if activation_fn_disc not in ['elu', 'relu', 'leaky-relu']:
+        raise Exception('Invalid activation function')
+
+    if dropout_percentage_disc < 0 or dropout_percentage_disc > 1:
+        raise Exception('Dropout percentage must be between 0 and 1')
+
+    if activation_fn_disc not in ['elu', 'relu', 'leaky-relu']:
+        raise Exception('Invalid activation function')
+
     print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
 
-    cgan = ConditionalGANSCA("./results/generator_" + gen_idx + "_" + disc_idx + ".h5",
-                             generator_idx=int(gen_idx),
-                             discriminator_idx=int(disc_idx))
-    if should_train:
-        cgan.train()
+    cgan = ConditionalGANSCA(num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
+                             num_nodes_disc, activation_fn_disc)
+
+    cgan.train()
     cgan.attack()

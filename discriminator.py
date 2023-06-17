@@ -1,17 +1,20 @@
 from tensorflow.keras.layers import *
 
 
-def get_discriminator_layers(discriminator_idx, input_layer):
+def get_discriminator_layers(input_layer, num_layers, dropout_percentage, num_nodes, activation_fn):
     gen = input_layer
-    if discriminator_idx == 1:
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.3)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.3)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
-        gen = Dropout(0.3)(gen)
-        gen = Dense(400, activation='elu', kernel_initializer='he_uniform')(gen)
+    for _ in range(num_layers - 1):
+        if activation_fn != 'leaky-relu':
+            gen = Dense(num_nodes, activation_fn, kernel_initializer='he_uniform')(gen)
+            gen = Dropout(dropout_percentage)(gen)
+        else:
+            gen = Dense(num_nodes, kernel_initializer='he_uniform')(gen)
+            gen = LeakyReLU(alpha=0.05)(gen)
+            gen = Dropout(dropout_percentage)(gen)
+
+    if activation_fn != 'leaky-relu':
+        gen = Dense(num_nodes, activation_fn, kernel_initializer='he_uniform')(gen)
     else:
-        print(discriminator_idx)
-        raise Exception("Invalid Discriminator Index")
+        gen = Dense(num_nodes, kernel_initializer='he_uniform')(gen)
+        gen = LeakyReLU(alpha=0.05)(gen)
     return gen
