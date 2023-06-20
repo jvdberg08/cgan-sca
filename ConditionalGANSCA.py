@@ -158,14 +158,20 @@ class DataLoader:
 class ConditionalGANSCA:
 
     def __init__(self, num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
-                 num_nodes_disc, activation_fn_disc):
+                 num_nodes_disc, activation_fn_disc, network_optimizer, network_optimizer_learn,
+                 batch_size, n_epochs, training_size):
         self.file_suffix = "lg" + str(num_layers_gen) \
                            + "_ng" + str(num_nodes_gen) \
                            + "_ag" + activation_fn_gen \
                            + "_ld" + str(num_layers_disc) \
                            + "_dd" + str(dropout_percentage_disc) \
                            + "_nd" + str(num_nodes_disc) \
-                           + "_ad" + activation_fn_disc
+                           + "_ad" + activation_fn_disc \
+                           + "_no" + network_optimizer \
+                           + "_nol" + str(network_optimizer_learn) \
+                           + "_bs" + str(batch_size) \
+                           + "_ep" + str(n_epochs) \
+                           + "_tr" + str(training_size)
         self.generator_file = "./results/generator_" + self.file_suffix + ".h5"
         self.num_layers_gen = num_layers_gen
         self.num_nodes_gen = num_nodes_gen
@@ -174,6 +180,11 @@ class ConditionalGANSCA:
         self.dropout_percentage_disc = dropout_percentage_disc
         self.num_nodes_disc = num_nodes_disc
         self.activation_fn_disc = activation_fn_disc
+        self.network_optimizer = network_optimizer
+        self.network_optimizer_learn = network_optimizer_learn
+        self.batch_size = batch_size
+        self.n_epochs = n_epochs
+        self.training_size = training_size
 
         """ Create dataset """
         self.dataset = DataLoader()
@@ -263,7 +274,9 @@ class ConditionalGANSCA:
         # define gan model as taking noise and label and outputting a classification
         model = Model([gen_noise, gen_label], gan_output)
         # compile model
-        opt = Adam(lr=0.0002, beta_1=0.5)
+        opt = Adam(lr=self.network_optimizer_learn, beta_1=0.5)
+        if network_optimizer == 'sgd':
+            opt = SGD(lr=self.network_optimizer_learn)
         model.compile(loss='binary_crossentropy', optimizer=opt)
         model.summary()
         return model
@@ -319,9 +332,8 @@ class ConditionalGANSCA:
         plt.savefig('./results/result_e' + str(epoch) + '_' + self.file_suffix + '.png')
         plt.clf()
 
-    def train(self, n_epochs=10, training_set_size=200000):
-        batch_size = 400
-        n_batches = int(training_set_size / batch_size)
+    def train(self):
+        n_batches = int(self.training_size / self.batch_size)
 
         all_d_loss_real = []
         all_d_loss_fake = []
@@ -554,19 +566,31 @@ if __name__ == '__main__':
     num_nodes_disc = int(sys.argv[6])
     activation_fn_disc = sys.argv[7]
 
-    if activation_fn_disc not in ['elu', 'relu', 'leaky-relu']:
+    if activation_fn_disc not in ['elu', 'relu', 'leaky-relu'] or activation_fn_gen not in ['elu', 'relu',
+                                                                                            'leaky-relu']:
         raise Exception('Invalid activation function')
-
+    if activation_fn_gen not in ['elu', 'relu', 'leaky-relu']:
+        raise Exception('Invalid activation function')
     if dropout_percentage_disc < 0 or dropout_percentage_disc > 1:
         raise Exception('Dropout percentage must be between 0 and 1')
 
-    if activation_fn_disc not in ['elu', 'relu', 'leaky-relu']:
-        raise Exception('Invalid activation function')
+    network_optimizer = sys.argv[8]
+    network_optimizer_learn = float(sys.argv[9])
+
+    if network_optimizer not in ['adam', 'sgd']:
+        raise Exception('Invalid network optimizer')
+
+    batch_size = int(sys.argv[10])
+    n_epochs = int(sys.argv[11])
+    training_size = int(sys.argv[12])
+
+    print(network_optimizer, network_optimizer_learn, batch_size, n_epochs, training_size)
 
     print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
 
     cgan = ConditionalGANSCA(num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
-                             num_nodes_disc, activation_fn_disc)
+                             num_nodes_disc, activation_fn_disc, network_optimizer, network_optimizer_learn,
+                             batch_size, n_epochs, training_size)
 
     cgan.train()
     cgan.attack()
