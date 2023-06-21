@@ -60,7 +60,7 @@ class DataLoader:
         For more details, check here: https://github.com/ANSSI-FR/ASCAD/tree/master/ATMEGA_AES_v1
         """
 
-        self.filepath = "./ascad-variable_49900_to_50900.h5"
+        self.filepath = "../ascad-variable_49900_to_50900.h5"
 
         self.aes_key = "00112233445566778899AABBCCDDEEFF"  # AES encryption key
         self.target_byte_index = 0  # target AES key byte index
