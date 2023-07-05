@@ -60,7 +60,7 @@ class DataLoader:
         For more details, check here: https://github.com/ANSSI-FR/ASCAD/tree/master/ATMEGA_AES_v1
         """
 
-        self.filepath = "../ascad-variable_49900_to_50900.h5"
+        self.filepath = "ascad-variable_49900_to_50900.h5"
 
         self.aes_key = "00112233445566778899AABBCCDDEEFF"  # AES encryption key
         self.target_byte_index = 0  # target AES key byte index
@@ -157,7 +157,8 @@ class DataLoader:
 
 class ConditionalGANSCA:
 
-    def __init__(self, num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
+    def __init__(self, use_augmentation, num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc,
+                 dropout_percentage_disc,
                  num_nodes_disc, activation_fn_disc, network_optimizer, network_optimizer_learn,
                  batch_size, n_epochs, training_size):
         self.file_suffix = "lg" + str(num_layers_gen) \
@@ -173,6 +174,7 @@ class ConditionalGANSCA:
                            + "_ep" + str(n_epochs) \
                            + "_tr" + str(training_size)
         self.generator_file = "./results/generator_" + self.file_suffix + ".h5"
+        self.use_augmentation = use_augmentation
         self.num_layers_gen = num_layers_gen
         self.num_nodes_gen = num_nodes_gen
         self.activation_fn_gen = activation_fn_gen
@@ -513,32 +515,37 @@ class ConditionalGANSCA:
         plt.clf()
 
     def attack(self):
-
-        """ Generate a batch of synthetic measurements with the trained generator """
-        generated_batch_size = 200000
-        self.generator = self.define_generator()
-        self.generator.load_weights(self.generator_file)
-        # [traces_synthetic, labels_synthetic], _ = self.generate_fake_samples(generated_batch_size)
-        # traces_synthetic = self.scaler.transform(traces_synthetic)
-        traces_synthetic = []
-        labels_synthetic = []
         n_avg = 100
-        for _ in tqdm(range(10000)):
-            label = np.random.randint(0, 256, 1)
-            [traces, _], _ = self.generate_fake_samples(n_avg, labels=np.array([label for _ in range(n_avg)]))
-            traces_synthetic.append(np.mean(traces, axis=0))
-            labels_synthetic.append(label)
+        traces = []
+        labels = []
+        if self.use_augmentation:
+            """ Generate a batch of synthetic measurements with the trained generator """
+            self.generator = self.define_generator()
+            self.generator.load_weights(self.generator_file)
+            for _ in tqdm(range(10000)):
+                label = np.random.randint(0, 256, 1)
+                [synthetic_traces, _], _ = self.generate_fake_samples(n_avg,
+                                                                      labels=np.array([label for _ in range(n_avg)]))
+                traces.append(np.mean(synthetic_traces, axis=0))
+                labels.append(label)
 
-        traces_synthetic = np.array(traces_synthetic)
-        # traces_synthetic = self.scaler.transform(traces_synthetic)
+            traces = np.array(traces)
+            # traces_synthetic = self.scaler.transform(traces_synthetic)
 
-        self.snr_synthetic_set(traces_synthetic, labels_synthetic)
+            self.snr_synthetic_set(traces, labels)
+
+        else:
+            [real_traces, real_labels], _, _ = self.generate_real_samples(10000)
+            traces.append(real_traces)
+            labels.append(real_labels)
+
+            traces = np.array(traces)
 
         """ Define a neural network (MLP) to be trained with synthetic traces """
         model = self.mlp(self.dataset.classes, self.dataset.x_profiling.shape[1])
         model.fit(
-            x=traces_synthetic,
-            y=to_categorical(labels_synthetic, num_classes=self.dataset.classes),
+            x=traces,
+            y=to_categorical(labels, num_classes=self.dataset.classes),
             batch_size=100,
             verbose=2,
             epochs=200,
@@ -554,17 +561,21 @@ class ConditionalGANSCA:
 
 
 if __name__ == '__main__':
-    num_layers_gen = int(sys.argv[1])
-    num_nodes_gen = int(sys.argv[2])
-    activation_fn_gen = sys.argv[3]
+    print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
+
+    use_augmentation = bool(int(sys.argv[1]))
+
+    num_layers_gen = int(sys.argv[2])
+    num_nodes_gen = int(sys.argv[3])
+    activation_fn_gen = sys.argv[4]
 
     if activation_fn_gen not in ['elu', 'relu', 'leaky-relu']:
         raise Exception('Invalid activation function')
 
-    num_layers_disc = int(sys.argv[4])
-    dropout_percentage_disc = float(sys.argv[5])
-    num_nodes_disc = int(sys.argv[6])
-    activation_fn_disc = sys.argv[7]
+    num_layers_disc = int(sys.argv[5])
+    dropout_percentage_disc = float(sys.argv[6])
+    num_nodes_disc = int(sys.argv[7])
+    activation_fn_disc = sys.argv[8]
 
     if activation_fn_disc not in ['elu', 'relu', 'leaky-relu'] or activation_fn_gen not in ['elu', 'relu',
                                                                                             'leaky-relu']:
@@ -574,23 +585,20 @@ if __name__ == '__main__':
     if dropout_percentage_disc < 0 or dropout_percentage_disc > 1:
         raise Exception('Dropout percentage must be between 0 and 1')
 
-    network_optimizer = sys.argv[8]
-    network_optimizer_learn = float(sys.argv[9])
+    network_optimizer = sys.argv[9]
+    network_optimizer_learn = float(sys.argv[10])
 
     if network_optimizer not in ['adam', 'sgd']:
         raise Exception('Invalid network optimizer')
 
-    batch_size = int(sys.argv[10])
-    n_epochs = int(sys.argv[11])
-    training_size = int(sys.argv[12])
+    batch_size = int(sys.argv[11])
+    n_epochs = int(sys.argv[12])
+    training_size = int(sys.argv[13])
 
-    print(network_optimizer, network_optimizer_learn, batch_size, n_epochs, training_size)
+    cgan = ConditionalGANSCA(use_augmentation, num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc,
+                             dropout_percentage_disc, num_nodes_disc, activation_fn_disc, network_optimizer,
+                             network_optimizer_learn, batch_size, n_epochs, training_size)
 
-    print("GPUs Available: " + str(len(tensorflow.config.list_physical_devices('GPU'))))
-
-    cgan = ConditionalGANSCA(num_layers_gen, num_nodes_gen, activation_fn_gen, num_layers_disc, dropout_percentage_disc,
-                             num_nodes_disc, activation_fn_disc, network_optimizer, network_optimizer_learn,
-                             batch_size, n_epochs, training_size)
-
-    cgan.train()
+    if use_augmentation:
+        cgan.train()
     cgan.attack()

@@ -20,18 +20,9 @@ def main():
     plt.ylabel("Guessing Entropy")
     plt.legend()
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))  # Force integer x-axis ticks
-    plt.xlim(0, 20)
+    plt.xlim(0, 10)
     # plt.ylim(0, 40)
     plt.show()
-
-
-def get_parameter_value(file, parameter):
-    index = file.index(parameter) + len(parameter)
-    value = ''
-    while file[index] != '_' and file[index:] != '.txt':
-        value += file[index]
-        index += 1
-    return value
 
 
 def get_file_name(experiment_value_batch, experiment_value_epochs, experiment_value_training):

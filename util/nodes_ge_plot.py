@@ -23,14 +23,6 @@ def main():
     plt.show()
 
 
-def get_parameter_value(file, parameter):
-    index = file.index(parameter) + len(parameter)
-    value = ''
-    while file[index] != '_' and file[index:] != '.txt':
-        value += file[index]
-        index += 1
-    return value
-
 
 def get_file_name(experiment_value_gen, experiment_value_disc):
     return "results/experiment-nodes/ge_lg6_ng" + experiment_value_gen \

@@ -23,15 +23,6 @@ def main():
     plt.show()
 
 
-def get_parameter_value(file, parameter):
-    index = file.index(parameter) + len(parameter)
-    value = ''
-    while file[index] != '_' and file[index:] != '.txt':
-        value += file[index]
-        index += 1
-    return value
-
-
 def get_file_name(experiment_value_gen, experiment_value_disc):
     return "results/experiment-layers/ge_lg" + experiment_value_gen \
         + "_ng160_agelu_ld" + experiment_value_disc + "_dd0.3_nd250_adelu_noadam_nol0.0002_bs400_ep10_tr200000.txt"
